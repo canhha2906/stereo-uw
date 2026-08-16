@@ -1,0 +1,28 @@
+name: v3_r16_2d
+backbone: v3
+agg: 2d
+res: 16
+d_max: 256
+groups: 8
+feat_channels: 32
+crop_h: 256
+crop_w: 512
+batch_size: 8
+num_workers: 4
+amp: true
+
+pretrain:
+  lr: 1.0e-3
+  epochs: 10
+  warmup_iters: 500
+  weight_decay: 1.0e-4
+
+finetune:
+  lr: 1.0e-4
+  epochs: 10
+  weight_decay: 1.0e-4
+
+deploy:
+  input_h: 480
+  input_w: 640
+  precision: fp16

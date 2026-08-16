@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+onnx/
+engines/
+*.engine
+*.onnx
+*.ckpt
+*.pt
+*.log
+.vscode/

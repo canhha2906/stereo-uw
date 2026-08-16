@@ -1,0 +1,30 @@
+name: agg2d
+backbone: v2_imagenet
+agg: 2d
+res: 8
+d_max: 192
+groups: 8
+feat_channels: 32
+crop_h: 256
+crop_w: 512
+batch_size: 8
+num_workers: 0
+amp: true
+
+pretrain:
+  dataset: sceneflow
+  lr: 1.0e-3
+  epochs: 20
+  warmup_iters: 500
+  weight_decay: 1.0e-4
+
+finetune:
+  dataset: uwstereo
+  lr: 1.0e-4
+  epochs: 30
+  weight_decay: 1.0e-4
+
+deploy:
+  input_h: 480
+  input_w: 640
+  precision: fp16
