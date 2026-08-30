@@ -16,7 +16,6 @@ import torch
 import torch.nn as nn
 
 from .feature_extractor import FeatureExtractor
-from .feature_extractor_v3 import FeatureExtractorV3
 from .context_encoder import ContextEncoder
 from .cost_volume import CostVolume
 from .aggregation_3d import Aggregation3D
@@ -30,8 +29,6 @@ def build_backbone(kind: str, out_channels: int, output_stride: int) -> nn.Modul
         if output_stride != 8:
             raise ValueError(f"v2 backbone only supports output_stride=8, got {output_stride}")
         return FeatureExtractor(out_channels=out_channels)
-    if kind == "v3":
-        return FeatureExtractorV3(out_channels=out_channels, output_stride=output_stride)
     if kind == "v2_imagenet":
         from .backbone_pretrained import MobileNetV2Pretrained
         return MobileNetV2Pretrained(out_channels=out_channels,

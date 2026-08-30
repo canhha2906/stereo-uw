@@ -57,7 +57,7 @@ class TrainCfg:
     val_every: int = 1
     out_dir: str = "runs"
     precision: str = "auto"  # "auto" | "bf16" | "fp16" | "fp32"
-    backbone: str = "v2"     # "v2" or "v3"
+    backbone: str = "v2"     # "v2" or "v2_imagenet"
     use_context: bool = False  # left-image context branch into aggregation
     context_pretrained: bool = False  # ImageNet-pretrained context encoder
 
