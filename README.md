@@ -1,7 +1,5 @@
 # stereo-uw
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/jSMFnvpxw)
-
 Lightweight learned stereo for underwater depth on the Jetson Orin Nano.
 SceneFlow pretrain → UWStereo finetune → TensorRT deployment → accuracy / latency / energy characterization.
 
