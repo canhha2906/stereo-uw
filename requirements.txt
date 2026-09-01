@@ -7,3 +7,4 @@ tensorboard>=2.15
 onnx>=1.15
 onnxruntime>=1.17
 tqdm>=4.66
+timm>=0.9
