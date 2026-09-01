@@ -1,15 +1,14 @@
 """Lightweight monocular depth student, distilled from a frozen teacher.
 
-Reuses the same ImageNet-pretrained MobileNetV2 encoder as the stereo
-branch (`models/backbone_pretrained.py`) so both directions of the paper
-share one edge-friendly feature extractor; only the head differs (dense
-depth regression here vs. cost-volume aggregation there).
+Uses an ImageNet-pretrained MobileNetV2 encoder (`distill/encoder.py`) for
+an edge-friendly feature extractor, with a small dense-depth regression
+head on top.
 """
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.backbone_pretrained import MobileNetV2Pretrained
+from distill.encoder import MobileNetV2Encoder
 
 _IMAGENET_MEAN = (0.485, 0.456, 0.406)
 _IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -35,9 +34,9 @@ class DepthHead(nn.Module):
 class MonoDepthStudent(nn.Module):
     def __init__(self, feat_channels: int = 32, output_stride: int = 8):
         super().__init__()
-        self.encoder = MobileNetV2Pretrained(out_channels=feat_channels,
-                                             output_stride=output_stride,
-                                             pretrained=True)
+        self.encoder = MobileNetV2Encoder(out_channels=feat_channels,
+                                          output_stride=output_stride,
+                                          pretrained=True)
         self.head = DepthHead(feat_channels)
         self.register_buffer("mean", torch.tensor(_IMAGENET_MEAN).view(1, 3, 1, 1))
         self.register_buffer("std", torch.tensor(_IMAGENET_STD).view(1, 3, 1, 1))

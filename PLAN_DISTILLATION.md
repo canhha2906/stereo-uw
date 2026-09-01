@@ -1,9 +1,12 @@
 # Distillation + Physics-Based Underwater Adaptation
 
-Active direction as of 2026-09-01, superseding the stereo-only approach
-as the paper's primary experiment (the stereo/GwcNet-lite code under
-`models/`, `data/`, `train.py`, etc. is kept as-is for reference/comparison,
-not deleted).
+Active direction as of 2026-09-01, replacing the earlier stereo-only
+approach entirely — the old GwcNet-lite stereo pipeline (`models/`,
+`data/`, `train.py`, `finetune.py`, `evaluate.py`, `engine.py`,
+`export_tensorrt.py`, `benchmark.py`, `baselines/`, `scripts/`, old
+`configs/*.yaml`, and `runs/` checkpoints) was deleted from this repo in
+the same commit that added the files below. It remains recoverable from
+git history (`git log --diff-filter=D`) if ever needed for comparison.
 
 ## The idea
 
@@ -31,12 +34,19 @@ despite never training on real underwater depth.
 |---|---|
 | `distill/underwater_physics.py` | `synthesize_underwater()` — the Jaffe-McGlamery simulator, `I = J*e^(-βd) + A*(1-e^(-βd))`, with randomized per-channel attenuation (β) and backscatter (A) for domain randomization |
 | `distill/teacher.py` | Frozen MiDaS-small wrapper — the only source of pseudo depth labels |
-| `distill/student.py` | `MonoDepthStudent` — reuses `models/backbone_pretrained.py`'s MobileNetV2 encoder + a small dense-depth head |
+| `distill/encoder.py` | Self-contained ImageNet-pretrained MobileNetV2 encoder |
+| `distill/student.py` | `MonoDepthStudent` — `distill/encoder.py` + a small dense-depth head |
 | `distill/losses.py` | Scale-and-shift-invariant L1 (teacher depth has no metric scale) |
 | `distill/dataset.py` | `CleanImageFolder` — any generic land-photo folder, no labels needed |
+| `distill/pfm.py` | Minimal PFM reader, for UWStereo disparity GT during eval only |
+| `distill/uwstereo_index.py` | Minimal UWStereo file-index builder, for eval only |
 | `distill/train_distill.py` | Training loop, `--ablation none` (baseline) vs `--ablation physics` (proposed) |
 | `distill/evaluate_zeroshot.py` | Quantitative zero-shot AbsRel on UWStereo (disparity→depth), qualitative dumps on FLSea |
 | `configs/distill_uw.yaml` | Model/training/physics hyperparameters |
+
+`distill/` has no dependency on any deleted stereo-pipeline package — it's
+fully self-contained (its own PFM reader and UWStereo index builder,
+rather than importing the old `data/` package).
 
 ## Setup steps
 
@@ -74,10 +84,11 @@ python -m distill.evaluate_zeroshot --ckpt runs_distill\distill_uw-physics\last.
 ```
 
 **4. (Optional, later) Edge deployment** — once the physics-augmented
-model's accuracy is validated, it can go through the same
-`export_tensorrt.py` gate as the stereo models: swap in `MonoDepthStudent`
-in place of `GwcNetLite`, single-image input instead of a stereo pair.
-Not wired up yet — do this only after the accuracy story above holds up.
+model's accuracy is validated, `MonoDepthStudent` should go through an
+ONNX export + TensorRT build gate (single-image input, so simpler than
+the old stereo pair export) before any deployment claims are made. No
+export script exists yet in this repo — write and validate one only
+after the accuracy story above holds up.
 
 ## Results table (fill in after running the two ablations)
 

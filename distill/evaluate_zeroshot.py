@@ -25,10 +25,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from data.pfm import read_pfm
-from data.uwstereo import build_index
 from distill.losses import _lstsq_scale_shift
+from distill.pfm import read_pfm
 from distill.student import MonoDepthStudent
+from distill.uwstereo_index import build_index
 
 
 def load_student(ckpt_path, device):
