@@ -1,0 +1,20 @@
+name: distill_uw
+teacher: midas_small
+student_out_stride: 8
+input_h: 384
+input_w: 384
+batch_size: 8
+num_workers: 0
+epochs: 20
+lr: 1.0e-4
+weight_decay: 1.0e-4
+
+# Domain-randomization ranges for the underwater light-transmission
+# simulator (see distill/underwater_physics.py). beta_r > beta_g > beta_b
+# reflects that red attenuates fastest in water.
+physics:
+  beta_r_range: [0.3, 1.2]
+  beta_g_range: [0.05, 0.5]
+  beta_b_range: [0.02, 0.3]
+  backscatter_range: [0.05, 0.6]
+  depth_scale_range: [1.0, 8.0]

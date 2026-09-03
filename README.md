@@ -1,50 +1,70 @@
 # stereo-uw
 
-Lightweight learned stereo for underwater depth on the Jetson Orin Nano.
-SceneFlow pretrain → UWStereo finetune → TensorRT deployment → accuracy / latency / energy characterization.
+Zero-shot monocular depth for underwater robotics via **distillation +
+physics-based domain adaptation**, targeting real-time inference on
+resource-constrained hardware.
 
-This is the codebase for a 6-page conference paper. See the original brief
-in `instruction/CLAUDE.md` (one directory up from the data set folder).
+A frozen pretrained monocular depth model (teacher) supplies pseudo-depth
+on ordinary "land" photos. A physics-based underwater light-transmission
+simulator turns those photos underwater-looking. A small student network
+is trained to recover the teacher's clean-image depth while only ever
+looking at the synthesized-underwater image — so it generalizes to real
+underwater scenes without ever training on underwater depth labels.
 
-## Scope (unranked-venue trim, 2026-06-05)
-- 2 checkpoints: `--agg 3d` and `--agg 2d`, both at feature stride 1/8.
-- Precision sweep: FP32 + FP16 (INT8 deferred to future work).
-- Baseline: OpenCV SGBM only.
-- Hardware: Jetson Orin Nano (8 GB), 25 W "Super" mode, `jetson_clocks` pinned.
+See **`PLAN_DISTILLATION.md`** for the full design, code map, and results
+template.
 
-## What gates everything
-**Do not train anything until `export_tensorrt.py` produces working `.engine` files
-for BOTH `--agg 3d` and `--agg 2d` on the target Orin.** Group-wise correlation and
-`grid_sample` (convex upsample) are the known TensorRT failure points.
+## Why this approach
+
+Underwater depth training data is scarce. A monocular depth model trained
+purely on land imagery degrades badly underwater (color cast + light
+attenuation are out-of-distribution for it). Rather than collecting real
+underwater depth ground truth, this project synthesizes the underwater
+domain shift with a physics model and distills a small student through
+that synthetic shift — turning the scarce-data problem into a
+domain-randomization problem.
 
 ## Quickstart
 
 ```powershell
-# Windows / dev box
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+# first run downloads MiDaS_small weights via torch.hub (needs internet once)
 
-# GATE step (run on Orin after copying gwc_3d.onnx and gwc_2d.onnx)
-python export_tensorrt.py --agg 3d --out onnx/gwc_3d.onnx
-python export_tensorrt.py --agg 2d --out onnx/gwc_2d.onnx
-# then on the Orin:
-# trtexec --onnx=gwc_3d.onnx --saveEngine=gwc_3d.engine --fp16
+# baseline ablation: distill directly on clean images (no physics) --
+# the "land model dropped underwater, works badly" case
+python -m distill.train_distill --config configs\distill_uw.yaml `
+    --clean-images-root D:\clean_images --ablation none --epochs 20
 
-# Train (after GATE passes)
-python train.py     --config configs/ref.yaml
-python finetune.py  --config configs/ref.yaml --pretrained runs/ref/last.ckpt
-python evaluate.py  --config configs/ref.yaml --ckpt runs/ref-ft/best.ckpt
+# proposed method: distillation through the physics simulator
+python -m distill.train_distill --config configs\distill_uw.yaml `
+    --clean-images-root D:\clean_images --ablation physics --epochs 20
 
-# Benchmark on Orin
-python benchmark.py --engine gwc_3d.engine --precision fp16
+# zero-shot evaluation of either checkpoint
+python -m distill.evaluate_zeroshot --ckpt runs_distill\distill_uw-physics\last.ckpt `
+    --uwstereo-root "...\UWStereo" --flsea-root "...\FLSea-challenge"
 ```
 
-## Dataset locations (Windows dev box)
-- SceneFlow: `C:\Users\canhh\Workspace\conference paper, computer vision\data set\` (flyingthings + monka + driving — partial; disparity GT pending download)
-- UWStereo:  `C:\Users\canhh\Workspace\conference paper, computer vision\data set\UWStereo\` (29,568 pairs, 720×1280, D_max≈240–448 observed)
-- FLSea:     `...\data set\FLSea-challenge\` (real underwater — qualitative-only, no quantitative training/eval)
+## Code map
 
-## Honest disclaimers (for the paper)
-- Synthetic-domain study. No real-water ground truth. Sim-to-real adaptation is future work.
-- The contribution is **characterization** — not the network. GwcNet-lite is the measurement vehicle.
+| Path | Role |
+|---|---|
+| `distill/underwater_physics.py` | Jaffe-McGlamery underwater image formation simulator |
+| `distill/teacher.py` | Frozen MiDaS-small wrapper, source of pseudo-depth labels |
+| `distill/student.py` | Small MobileNetV2-encoder depth student |
+| `distill/losses.py` | Scale-and-shift-invariant distillation loss |
+| `distill/dataset.py` | Generic land-photo folder loader (no labels needed) |
+| `distill/train_distill.py` | Training entry point (`--ablation none` vs `physics`) |
+| `distill/evaluate_zeroshot.py` | Zero-shot eval: UWStereo (quantitative), FLSea (qualitative) |
+| `configs/distill_uw.yaml` | Model / training / physics hyperparameters |
+
+## Honest disclaimers
+
+- The physics simulator's depth input is a monocular teacher's *relative*
+  depth with a randomized scale factor, not a calibrated water distance —
+  it's a domain-randomization tool, not a metrically accurate underwater
+  renderer.
+- FLSea has no depth ground truth; all FLSea results are qualitative only.
+- The student has no metric scale, so quantitative comparisons use
+  scale-shift-aligned metrics (see `PLAN_DISTILLATION.md`).

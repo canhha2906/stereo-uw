@@ -1,5 +1,7 @@
-"""PFM reader/writer. SceneFlow and UWStereo both store disparity as PFM."""
+"""Minimal PFM reader (SceneFlow/UWStereo disparity format). Self-contained
+copy so `distill/` doesn't depend on the deleted `data/` package."""
 import re
+
 import numpy as np
 
 
