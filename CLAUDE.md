@@ -188,7 +188,7 @@ Each of these fills a gap Thái's message left open. None of them change the pip
 | β taken from UWCNN's Jerlov tables | Thái said "mô hình vật lý" without specifying coefficients. UWCNN is the standard published source. |
 | Stage 0 reproduces the authors' KITTI numbers first | If the downloaded checkpoint is not what it claims, every later comparison is meaningless. |
 | KITTI val D1 tracked during Stage 3 | Detects the failure where the model forgets how to match instead of learning to see through water. |
-| Reuse `distill/underwater_physics.py` | It already implements the exact equation; rewriting it would risk a different bug. |
+| Reuse `old_monocular/distill/underwater_physics.py` | It already implements the exact equation; rewriting it would risk a different bug. |
 | Reuse Paper 1's Orin tooling at Stage 6 | Thái said "quantize"; `build_int8.py`, `export_tensorrt.py`, `benchmark.py` already do it. |
 
 ### 6.3 Deliberately NOT being done

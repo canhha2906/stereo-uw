@@ -1,70 +1,51 @@
 # stereo-uw
 
-Zero-shot monocular depth for underwater robotics via **distillation +
-physics-based domain adaptation**, targeting real-time inference on
-resource-constrained hardware.
+Underwater stereo depth. Two papers share this repo.
 
-A frozen pretrained monocular depth model (teacher) supplies pseudo-depth
-on ordinary "land" photos. A physics-based underwater light-transmission
-simulator turns those photos underwater-looking. A small student network
-is trained to recover the teacher's clean-image depth while only ever
-looking at the synthesized-underwater image — so it generalizes to real
-underwater scenes without ever training on underwater depth labels.
+**Current direction (Paper 2):** take a stereo network pretrained on land
+(Fast-ACVNet, KITTI), measure how badly it fails underwater, then retrain it on
+KITTI **rendered through a physical underwater light-attenuation model** and measure
+how much that recovers — without ever training on underwater data. Then distill, then
+quantize.
 
-See **`PLAN_DISTILLATION.md`** for the full design, code map, and results
-template.
+Read **`CLAUDE.md`** for the plan and **`TRAINING_AND_RESULTS.md`** for the commands
+and results tables.
 
-## Why this approach
+> Status: nothing has been run yet. Fast-ACVNet is not cloned, KITTI is not
+> downloaded, and every results table is empty on purpose.
 
-Underwater depth training data is scarce. A monocular depth model trained
-purely on land imagery degrades badly underwater (color cast + light
-attenuation are out-of-distribution for it). Rather than collecting real
-underwater depth ground truth, this project synthesizes the underwater
-domain shift with a physics model and distills a small student through
-that synthetic shift — turning the scarce-data problem into a
-domain-randomization problem.
+---
 
-## Quickstart
+## Layout
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-# first run downloads MiDaS_small weights via torch.hub (needs internet once)
-
-# baseline ablation: distill directly on clean images (no physics) --
-# the "land model dropped underwater, works badly" case
-python -m distill.train_distill --config configs\distill_uw.yaml `
-    --clean-images-root D:\clean_images --ablation none --epochs 20
-
-# proposed method: distillation through the physics simulator
-python -m distill.train_distill --config configs\distill_uw.yaml `
-    --clean-images-root D:\clean_images --ablation physics --epochs 20
-
-# zero-shot evaluation of either checkpoint
-python -m distill.evaluate_zeroshot --ckpt runs_distill\distill_uw-physics\last.ckpt `
-    --uwstereo-root "...\UWStereo" --flsea-root "...\FLSea-challenge"
-```
-
-## Code map
-
-| Path | Role |
+| Path | What it is |
 |---|---|
-| `distill/underwater_physics.py` | Jaffe-McGlamery underwater image formation simulator |
-| `distill/teacher.py` | Frozen MiDaS-small wrapper, source of pseudo-depth labels |
-| `distill/student.py` | Small MobileNetV2-encoder depth student |
-| `distill/losses.py` | Scale-and-shift-invariant distillation loss |
-| `distill/dataset.py` | Generic land-photo folder loader (no labels needed) |
-| `distill/train_distill.py` | Training entry point (`--ablation none` vs `physics`) |
-| `distill/evaluate_zeroshot.py` | Zero-shot eval: UWStereo (quantitative), FLSea (qualitative) |
-| `configs/distill_uw.yaml` | Model / training / physics hyperparameters |
+| `CLAUDE.md` | Paper 2 plan. Sections 0–5 are the senior's plan; section 6 is everything added on top, kept separate on purpose. |
+| `TRAINING_AND_RESULTS.md` | Per-stage commands, prerequisites, empty results tables. |
+| `models/` | **Paper 1.** GwcNet-lite: feature extractor, group-wise correlation cost volume, 2D and 3D aggregation, context encoder, soft-argmin, upsample. |
+| `data/` | SceneFlow + UWStereo loaders, PFM reader, stereo-safe augmentation. |
+| `engine.py`, `train.py`, `finetune.py`, `evaluate.py` | Paper 1 training and evaluation. |
+| `configs/` | Paper 1's 2×2 ablation: 2D/3D aggregation × context on/off. |
+| `runs/` | 16 trained checkpoints + TensorBoard logs for those 4 cells. |
+| `baselines/` | SGBM (floor) and PSMNet (ceiling). |
+| `export_tensorrt.py`, `build_int8.py`, `benchmark.py` | Jetson Orin Nano deployment: ONNX export, INT8 engine, latency/power/energy. Reused by Paper 2 at Stage 6. |
+| `scripts/` | GATE checks, D_max scan, INT8 calibration dump, smoke tests. |
+| `old_monocular/` | **Superseded.** A monocular distillation direction explored on 2026-09-01. Kept for reference, not deleted. |
 
-## Honest disclaimers
+## Environments
 
-- The physics simulator's depth input is a monocular teacher's *relative*
-  depth with a randomized scale factor, not a calibrated water distance —
-  it's a domain-randomization tool, not a metrically accurate underwater
-  renderer.
-- FLSea has no depth ground truth; all FLSea results are qualitative only.
-- The student has no metric scale, so quantitative comparisons use
-  scale-shift-aligned metrics (see `PLAN_DISTILLATION.md`).
+- Paper 1 code runs in the conda env `stereo` (recent PyTorch, Blackwell GPU).
+- Fast-ACVNet pins PyTorch 1.10 / CUDA 11.3 and needs its own environment. Whether
+  that runs on the RTX 5060 is untested — check before relying on it.
+
+## Paper 1 (previous direction, complete)
+
+Lightweight learned stereo characterized on the Jetson Orin Nano: accuracy, latency
+and energy across 2D vs 3D aggregation and a precision sweep. Its spec lives at
+`conference paper, computer vision/instruction/CLAUDE.md`. Its code and checkpoints
+here stay untouched.
+
+## Branches
+
+- `main` — both papers, nothing deleted
+- `monocular-distill` — the 2026-09-01 monocular lineage, preserved as it was

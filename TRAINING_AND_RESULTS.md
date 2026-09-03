@@ -88,7 +88,7 @@ Also save qualitative disparity maps — the failure mode matters as much as the
 
 ### Reuse what already exists
 
-`distill/underwater_physics.py` already implements the exact equation in `CLAUDE.md`:
+`old_monocular/distill/underwater_physics.py` already implements the exact equation in `CLAUDE.md`:
 
 ```
 I_c(x) = J_c(x) · t_c(x) + A_c · (1 − t_c(x))
