@@ -152,3 +152,53 @@ project living in the same repo. Its spec is at
 `conference paper, computer vision/instruction/CLAUDE.md` and its code
 (`models/`, `train.py`, `finetune.py`, `evaluate.py`, `configs/`, `runs/`) stays
 untouched. Reuse from it is limited to the deployment tooling named in Stage 6.
+
+---
+
+## 6. Deviations and extensions beyond Thái's plan
+
+**Rule:** Sections 0–5 above are Thái's plan. Anything *not* literally in his
+instructions is recorded here, labelled, so it is always clear what came from him and
+what was added while implementing. If anything in this section ever conflicts with
+Sections 0–5, **his plan wins.**
+
+**Venue target:** unranked or low-ranked conference. The bar is a sound experiment
+honestly reported, not a SOTA result. Do not inflate scope to chase a stronger venue.
+
+### 6.1 Forced by implementation — not design choices
+
+These are not alternatives; the experiment is wrong without them.
+
+- **Same water parameters for the left and right image of a pair.** Different β or A
+  per eye breaks stereo correspondence and the network would be learning from an
+  impossible image pair.
+- **Disparity ground truth is reused unchanged.** Rendering recolours pixels, it does
+  not move them, so KITTI's labels stay valid.
+- **An evaluation script has to be written.** Fast-ACVNet ships `save_disp.py` for
+  KITTI benchmark submission, not an EPE/D1 evaluator for UWStereo or SQUID.
+
+### 6.2 Added while writing the spec
+
+Each of these fills a gap Thái's message left open. None of them change the pipeline.
+
+| Addition | Why |
+|---|---|
+| SQUID as a second evaluation set | Thái said "tập dữ liệu dưới nước" without naming one. UWStereo is synthetic; SQUID is real water, so the claim is not synthetic-only. |
+| Metrics fixed as EPE, >3px, D1-all | Needed so Stage 1 and Stage 4 are comparable. |
+| β taken from UWCNN's Jerlov tables | Thái said "mô hình vật lý" without specifying coefficients. UWCNN is the standard published source. |
+| Stage 0 reproduces the authors' KITTI numbers first | If the downloaded checkpoint is not what it claims, every later comparison is meaningless. |
+| KITTI val D1 tracked during Stage 3 | Detects the failure where the model forgets how to match instead of learning to see through water. |
+| Reuse `distill/underwater_physics.py` | It already implements the exact equation; rewriting it would risk a different bug. |
+| Reuse Paper 1's Orin tooling at Stage 6 | Thái said "quantize"; `build_int8.py`, `export_tensorrt.py`, `benchmark.py` already do it. |
+
+### 6.3 Deliberately NOT being done
+
+Discussed in earlier sessions, **rejected as out of scope.** Recorded here so no future
+session re-proposes them as if they were new ideas.
+
+- Turbidity sweep with β as a plotted axis (EPE vs water type curve)
+- Energy-per-frame / mJ characterization as a headline result
+- Head-to-head comparison against AquaStereo's diffusion rendering
+- Adding ULAP as an input prior or context-branch feature
+
+These are not part of Thái's plan. Do not add them, and do not pitch them again.
