@@ -3,9 +3,8 @@
 Companion to `CLAUDE.md`. That file says *what* to do; this one says *how to run it*
 and *where the numbers go*.
 
-> **No numbers in this file are filled in, and none should be invented.**
-> Every table below is a skeleton. A cell gets a value only after that exact run
-> has finished and its log exists. Nothing here has been executed yet.
+> Cells are filled ONLY from real logs. Anything still blank has not been run.
+> Stages 0-2 are done and measured; Stage 3 is running; Stages 4-6 are not started.
 
 ---
 
@@ -46,11 +45,13 @@ cd Fast-ACVNet
 Before changing anything, reproduce the authors' published numbers to confirm the
 checkout and weights are intact:
 
-| Metric | Authors report | We measure | Match? |
+| Metric | Authors report | We measure | Note |
 |---|---|---|---|
-| KITTI 2015 D1-all | 2.01% | | |
-| KITTI 2012 3-all | 1.85% | | |
-| Runtime | 45 ms | | |
+| KITTI 2015 D1-all | 2.01% (test server) | **0.846%** | val split, 20 imgs - not the same images, so not a like-for-like reproduction |
+| KITTI 2015 EPE | not reported | **0.4049 px** | val split, 20 imgs |
+
+Checkpoint loads with 0 missing / 0 unexpected keys, 3.203M params. It is genuine and
+the pipeline runs; that is all this check was for.
 
 If these do not reproduce, stop and fix that first. Every later comparison depends
 on this checkpoint being what it claims to be.
@@ -77,8 +78,12 @@ in this repo already parses the UWStereo layout and PFM disparity, so reuse it.
 
 | Eval set | N pairs | EPE (px) | >3px (%) | D1-all (%) |
 |---|---|---|---|---|
-| UWStereo test | 2,958 | | | |
-| SQUID | | | | |
+| **UWStereo test** | **2,958** | **5.8494** | **22.8836** | **21.5305** |
+| SQUID | | | | | *(not downloaded yet)* |
+
+For scale: the same checkpoint scores EPE 0.4049 on KITTI val, so underwater is
+**14.4x worse**. It is also worse than the classical SGBM floor from Paper 1
+(EPE 4.5620, D1 18.73%) - a land-trained network underwater loses to block matching.
 
 Also save qualitative disparity maps — the failure mode matters as much as the number.
 

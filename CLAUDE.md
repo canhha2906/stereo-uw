@@ -191,6 +191,58 @@ Each of these fills a gap Thái's message left open. None of them change the pip
 | Reuse `old_monocular/distill/underwater_physics.py` | It already implements the exact equation; rewriting it would risk a different bug. |
 | Reuse Paper 1's Orin tooling at Stage 6 | Thái said "quantize"; `build_int8.py`, `export_tensorrt.py`, `benchmark.py` already do it. |
 
+### 6.2b Found while actually running it (2026-09-03/05)
+
+Discovered during execution, not planned. All are recorded because they change results
+or were required to get anything to run at all.
+
+**Wavelength-dependent veiling light — a real deviation from UWCNN.**
+UWCNN draws the background light `B_c` uniformly in (0.8, 1): bright and neutral. On
+KITTI that inverts the colour cast, because
+
+    U_R - U_B = (I - B) * (T_R - T_B),  and  T_R < T_B
+
+so the sign is set by `(I - B)`. KITTI scenes are dark (mean 0.38) against a bright
+neutral B (~0.9), giving a *reddish* haze: measured R-B = +0.062. The evaluation domain
+is the opposite - UWStereo measures R-B between -0.10 and -0.27 with red near zero.
+Training reddish to test blue-green would fight the experiment. Fix: the veiling light
+is itself sunlight already filtered by water, so
+
+    B_c = B_surface * N_c ** d_ambient,   d_ambient = 10 m
+
+Rendered KITTI then measures R-B = -0.146, mean RGB [0.223, 0.368, 0.369] - inside the
+target range. **This is a deviation from the cited recipe and must be stated in the paper.**
+
+**Depth band.** UWCNN maps scene depth to 0.5-15 m (NYU indoor). KITTI is outdoor, true
+depth 6-83 m, so the whole range cannot be used or everything saturates to veiling
+light. Scene depth is rescaled into 0.5-8 m, 1st/99th percentile clipped.
+
+**Densification.** KITTI disparity GT is only ~19% dense, but rendering needs a distance
+for every pixel. Holes are filled by nearest valid neighbour, used ONLY to drive the
+physics. Supervision still uses the original sparse ground truth.
+
+**Transmission is base-N, not base-e.** UWCNN Eq. 2 is `T = N ** d`, i.e. 10^(-beta*d),
+not `exp(-beta*d)`. Using the wrong base silently changes the water by a factor of ln(10).
+
+**N_lambda values** are UWCNN Table 1, transcribed in `render_kitti_underwater.py`.
+
+**Environment.** Fast-ACVNet pins PyTorch 1.10/cu113, which does NOT support the Blackwell
+5060. It runs fine on torch 2.11/cu128 instead. Required fixes: `timm==0.5.4` (timm 1.x
+removed `EfficientNetFeatures.act1`), `np.lib.pad` -> `np.pad` in 5 files under `datasets/`
+(NumPy 2 removed the alias), plus matplotlib / scikit-image / opencv-python / scipy /
+tensorboardX.
+
+**main_kitti.py fork bomb on Windows.** All setup (SummaryWriter, datasets, model,
+optimizer) sat at module level with only `train()` behind the `__main__` guard. When the
+process is interrupted, tensorboardX's atexit cleanup touches a multiprocessing.Queue,
+which spawns a child, which re-imports the module, which builds another SummaryWriter,
+which spawns again - an unbounded cascade (25 processes observed, one every 3 s, GPU
+pinned at 100%). Fixed by moving the setup block into `_setup()` called from the
+`__main__` guard. `num_workers` also set 24 -> 0. Original kept as `main_kitti.py.orig`.
+
+**Training length.** Authors default to 500 epochs (`lrepochs 300:10`). Run at 60 epochs
+(`lrepochs 40:10`), batch 4, on 180 KITTI-2015 train images.
+
 ### 6.3 Deliberately NOT being done
 
 Discussed in earlier sessions, **rejected as out of scope.** Recorded here so no future
