@@ -10,3 +10,10 @@ engines/
 .vscode/
 runs_distill/
 eval_distill_out/
+
+# Stage 5 working checkpoints - rewritten every epoch, which makes git rehash a
+# 2 MB blob constantly and stalls pushes. The FINAL student is committed
+# explicitly as runs/stage5-distill/final.ckpt when a run completes.
+runs/stage5-distill/last.ckpt
+runs/stage5-distill/ep*.ckpt
+runs/stage5-distill-scratch/last.ckpt

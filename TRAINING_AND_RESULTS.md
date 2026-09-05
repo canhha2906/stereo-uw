@@ -4,7 +4,7 @@ Companion to `CLAUDE.md`. That file says *what* to do; this one says *how to run
 and *where the numbers go*.
 
 > Cells are filled ONLY from real logs. Anything still blank has not been run.
-> Stages 0-4 are done and measured. Stages 5-6 (distillation, quantization) not started.
+> Stages 0-5 are done and measured. Stage 6 (quantization) not started.
 
 ---
 
@@ -205,10 +205,31 @@ and it gets reported as such.
 
 Only after Stage 4 produces a result. Teacher = the Stage 3 model.
 
-| Model | Params (M) | UWStereo EPE | >3px | Latency (ms) |
-|---|---|---|---|---|
-| Teacher (Stage 3) | | | | |
-| Student (distilled) | | | | |
+Teacher = the Stage 3 model. Student = GwcNet-lite from Paper 1. Trained on the same
+200 rendered KITTI pairs, with dense teacher disparity plus KITTI's sparse GT.
+Fast-ACVNet's own base variant was rejected as a student: 3.075 M vs 3.203 M is only
+4% smaller.
+
+| Model | Params (M) | UWStereo EPE | D1-all (%) |
+|---|---|---|---|
+| Teacher — Fast-ACVNet+, physics-retrained | 3.203 | 5.4623 | 19.64 |
+| Student — GwcNet-lite, from scratch | 0.467 | 6.6738 | 27.84 |
+| Student — GwcNet-lite, SceneFlow-initialised | 0.467 | 6.8941 | 27.58 |
+
+**Distillation costs accuracy here: about 1.4 px EPE and 8 points of D1 for a 6.9x
+smaller model.** The student also lands worse than the Stage 1 direct-transfer baseline
+(5.8494), so at this size and data scale the compression is not worth it as it stands.
+
+**Initialisation was not the bottleneck.** The first student started essentially random
+apart from its ImageNet backbone, so it was re-run initialised from Paper 1's
+SceneFlow-pretrained checkpoint (26,790 pairs, loads 0 missing / 0 unexpected). Starting
+loss dropped from 14.77 to 2.69 — but final accuracy did not move (6.67 -> 6.89 EPE).
+Easier optimisation, same end point.
+
+The remaining suspect is data scale: 200 KITTI pairs is very little to adapt a network
+that never sees underwater imagery. For contrast, Paper 1's same architecture reaches
+EPE 1.62 on this split — but that model was finetuned on 29k UWStereo pairs, i.e. on the
+target domain, which this experiment forbids.
 
 ---
 

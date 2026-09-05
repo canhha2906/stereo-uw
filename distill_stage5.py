@@ -81,6 +81,10 @@ def main():
     ap.add_argument("--d-max", type=int, default=192)
     ap.add_argument("--w-gt", type=float, default=1.0)
     ap.add_argument("--w-kd", type=float, default=1.0)
+    ap.add_argument("--init", default=None,
+                    help="checkpoint to initialise the student from. Without this the "
+                         "cost volume, aggregation and regression heads start random and "
+                         "200 rendered pairs cannot train them - see stage5_eval.log")
     a = ap.parse_args()
 
     Path(a.out).mkdir(parents=True, exist_ok=True)
@@ -92,6 +96,15 @@ def main():
                        backbone="v2_imagenet", use_context=False).cuda()
     n_par = sum(p.numel() for p in model.parameters()) / 1e6
     print(f"student GwcNet-lite: {n_par:.3f} M params, {len(ds)} training pairs", flush=True)
+
+    if a.init:
+        sd = torch.load(a.init, map_location="cpu", weights_only=False)
+        sd = sd.get("model", sd)
+        missing, unexpected = model.load_state_dict(sd, strict=False)
+        print(f"initialised from {a.init}  (missing {len(missing)}, unexpected {len(unexpected)})",
+              flush=True)
+    else:
+        print("WARNING: student starts from scratch apart from the ImageNet backbone", flush=True)
 
     opt = torch.optim.Adam(model.parameters(), lr=a.lr, betas=(0.9, 0.999))
     sched = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=[int(a.epochs * 0.7)], gamma=0.1)
