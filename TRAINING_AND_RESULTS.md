@@ -4,7 +4,7 @@ Companion to `CLAUDE.md`. That file says *what* to do; this one says *how to run
 and *where the numbers go*.
 
 > Cells are filled ONLY from real logs. Anything still blank has not been run.
-> Stages 0-2 are done and measured; Stage 3 is running; Stages 4-6 are not started.
+> Stages 0-4 are done and measured. Stages 5-6 (distillation, quantization) not started.
 
 ---
 
@@ -167,11 +167,29 @@ Same eval code path as Stage 1, same sets, same metrics. Only the checkpoint dif
 
 **Results — the two rows the paper rests on**
 
-| Model | UWStereo EPE | UWStereo >3px | SQUID EPE | SQUID >3px |
-|---|---|---|---|---|
-| Fast-ACVNet+ KITTI (direct transfer) — *from Stage 1* | | | | |
-| Fast-ACVNet+ retrained on rendered KITTI | | | | |
-| Δ (improvement) | | | | |
+| Model | UWStereo EPE | >3px (%) | D1-all (%) |
+|---|---|---|---|
+| Fast-ACVNet+ KITTI, direct transfer — *Stage 1* | 5.8494 | 22.8836 | 21.5305 |
+| **Fast-ACVNet+ retrained on rendered KITTI (type III)** | **5.4623** | **20.8844** | **19.6414** |
+| Δ | **−0.3871 (−6.6%)** | **−2.00 pts (−8.7%)** | **−1.89 pts (−8.8%)** |
+
+N = 2,958 pairs, identical eval code path and disparity mask (0 < d < 192) in both rows.
+The only difference between the two rows is the checkpoint.
+
+**The direction holds: rendering KITTI through the physics model and finetuning on it
+improves underwater accuracy, consistently across all three metrics, without ever
+training on underwater data.**
+
+Two things to state honestly alongside that:
+
+1. **The gain is modest** — 6.6% EPE. The model is better underwater, not fixed.
+2. **It is still worse than the classical floor.** Paper 1's SGBM scores EPE 4.5620 /
+   D1 18.73% on this same split. A land-trained network retrained through simulated
+   water still loses to block matching underwater.
+
+Run conditions: water type III only; training stopped at epoch 54/60 when a harness
+timeout killed it mid-epoch (no crash, no error in the log), checkpoint_000053 used.
+LR had already dropped 10x at epoch 40, so most of the refinement phase had run.
 
 If the second row is better, the core claim holds. If it is not, that is the finding
 and it gets reported as such.
