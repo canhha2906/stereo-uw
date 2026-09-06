@@ -17,3 +17,9 @@ eval_distill_out/
 runs/stage5-distill/last.ckpt
 runs/stage5-distill/ep*.ckpt
 runs/stage5-distill-scratch/last.ckpt
+
+# TensorRT engines are device-specific (built for the RTX 5060) and large.
+# The Orin must build its own from the committed ONNX.
+engines/
+calib_rendered_kitti/
+*.cache

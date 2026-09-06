@@ -274,6 +274,41 @@ Verified **bit-identical** output before and after (max abs diff 0.000e+00). Ori
 kept as `.orig` beside each file. This belongs in the paper: it is exactly the class of
 edge-deployment obstacle the work is about, and it is not documented by the authors.
 
+### Quantization measured on the dev box (TensorRT 10.16, RTX 5060)
+
+All rows: UWStereo test, 300 pairs, engines built at 480x640 so disparity is scaled by
+0.5. Absolute EPE here is in 640-wide pixels and is **not** comparable to the
+native-resolution numbers above; the comparison that matters is between precisions.
+
+INT8 calibration used **rendered KITTI, never UWStereo** — calibration fits quantisation
+scales to data, so calibrating on the underwater set would leak the target domain and
+break the non-negotiable in section 2.
+
+| Model | Precision | EPE | D1-all (%) | Latency (ms) |
+|---|---|---|---|---|
+| Student 0.467 M | FP32 | 3.0609 | 31.81 | 2.82 |
+| Student 0.467 M | FP16 | 3.0623 | 31.83 | 9.32 |
+| Student 0.467 M | INT8 | **3.5672** | **35.31** | 11.07 |
+| Teacher 3.203 M | FP32 | 3.0258 | 26.46 | 16.47 |
+| Teacher 3.203 M | FP16 | 3.0305 | 26.48 | 8.55 |
+| Teacher 3.203 M | INT8 | **3.6652** | **32.35** | 24.30 |
+
+**FP16 is free.** Both models change by under 0.2% EPE, and the teacher gets a 1.9x
+speed-up (16.47 -> 8.55 ms) for it. FP16 should be the default deployment precision.
+
+**INT8 costs real accuracy.** Student +0.51 px EPE (+16.5%) and +3.5 points D1; teacher
++0.64 px (+21%) and +5.9 points. This is the failure Paper 1's spec predicted: cost-volume
+plus soft-argmin regression is fragile under INT8, and here it is quantified rather than
+assumed. The `--keep-fp16-output` idea in Paper 1's `build_int8.py` — quantise the trunk,
+keep the regression tail in higher precision — is the obvious next thing to test.
+
+**The INT8 latency numbers are anomalous and should not be quoted as a deployment claim.**
+INT8 came out *slower* than FP16 for both models, and the student's FP16 was slower than
+its FP32. That inverts the expected order and points at reformatting overhead between
+INT8 and the FP16 fallback layers on this laptop dGPU. The Orin is the actual target and
+has a different INT8 path; these timings do not transfer. **The accuracy column does
+transfer** — quantisation error is a property of the network, not the chip.
+
 ### Still to do, and it needs the hardware
 
 TensorRT engine build, INT8 calibration, FPS, and energy per frame **must run on the

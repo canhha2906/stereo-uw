@@ -177,7 +177,7 @@ run conditions are in `TRAINING_AND_RESULTS.md`.
 | Re-evaluate on underwater and compare | done | **EPE 5.4623**, >3px 20.88%, D1 19.64% |
 | Underwater data used for training | **never** | evaluation only, as required |
 | Distillation | done | GwcNet-lite 0.467 M, 6.9x smaller |
-| Quantization | partial | ONNX exported for both; TensorRT engines still to build |
+| Quantization | done on dev box | FP32/FP16/INT8 engines + accuracy for both models; **energy still needs the Orin** |
 
 ### The headline comparison
 
@@ -225,11 +225,31 @@ TensorRT both reject. Replaced with explicit `torch.topk`; output is bit-identic
 it is exactly the deployment obstacle this work is about, and the authors do not
 document it.
 
+### Quantization answer
+
+TensorRT 10.16 on the RTX 5060, UWStereo 300 pairs at 480x640. INT8 calibrated on
+**rendered KITTI, never UWStereo**.
+
+| Model | FP32 EPE | FP16 EPE | INT8 EPE |
+|---|---|---|---|
+| Student 0.467 M | 3.0609 | 3.0623 | **3.5672** |
+| Teacher 3.203 M | 3.0258 | 3.0305 | **3.6652** |
+
+**FP16 is free** (<0.2% change; teacher also gets 1.9x speed). **INT8 costs real
+accuracy** — +16.5% EPE on the student, +21% on the teacher. That is the cost-volume /
+soft-argmin fragility Paper 1's spec predicted, now quantified. Next thing to try is
+Paper 1's `--keep-fp16-output`: quantise the trunk, keep the regression tail in FP16.
+
+INT8 latency came out *slower* than FP16 on this laptop dGPU, which inverts the expected
+order and is almost certainly reformatting overhead. Do not quote it — the Orin has a
+different INT8 path. The accuracy column is the part that transfers.
+
 ### What is left
 
-- TensorRT engines, INT8, FPS — TensorRT is being installed on the dev box, which
-  answers whether INT8 breaks disparity regression (device-independent)
 - **Energy per frame requires the Jetson Orin Nano.** No laptop GPU can measure it.
+  Engines built here are for the 5060 and are not portable; the Orin must build its own
+  from the same ONNX.
+- `--keep-fp16-output` INT8 variant, to see if it recovers the accuracy loss
 - SQUID real-water evaluation — not downloaded (45.8 GB, and it gives distance maps
   rather than disparity, so it needs a conversion step)
 
