@@ -235,15 +235,60 @@ target domain, which this experiment forbids.
 
 ## 7. Stage 6 — Quantization
 
-Reuse Paper 1's tooling: `export_tensorrt.py`, `build_int8.py`, `scripts/dump_calib.py`,
-`benchmark.py`. Benchmark on the Orin Nano at 25 W with `jetson_clocks` pinned, and log
-the JetPack and TensorRT versions.
+Both models were taken through this stage, per the user's decision.
 
-| Precision | UWStereo EPE | Latency (ms) | FPS | Peak mem (MB) | Energy (mJ/frame) |
+### Done on the dev box: ONNX export + PyTorch reference timing
+
+| Model | Params (M) | ONNX | ORT vs PyTorch | Latency (ms) | Peak mem (MB) | UWStereo EPE |
+|---|---|---|---|---|---|---|
+| Teacher — Fast-ACVNet+ | 3.203 | 16.3 MB | 9.92e-05 | 34.2 | 371 | 5.4623 |
+| Student — GwcNet-lite | 0.467 | 5.6 MB | 1.53e-04 | 6.5 | 70 | 6.8941 |
+| ratio | 6.9x smaller | | | **5.3x faster** | 5.3x less | +1.43 px |
+
+Timing is 50 iterations at 480x640 after 10 warm-up passes, RTX 5060 Laptop, FP32
+PyTorch. **This is the dev GPU, not the Orin Nano** - the absolute numbers do not
+transfer, but the ratio between the two models is the point.
+
+This reframes the Stage 5 result. Distillation costs 1.43 px EPE and buys a 5.3x
+speed-up and 5.3x memory cut. Whether that trade is worth taking is a deployment-budget
+question, not a modelling one, and the paper should present it as such rather than
+calling distillation a failure.
+
+### Deployment blocker found: Fast-ACVNet+ does not export to ONNX as shipped
+
+Three places select a top-k by `sort()` followed by a slice. PyTorch exports that as a
+`TopK` node whose K operand both onnxruntime and TensorRT reject:
+
+    Node (/m/TopK) Op (TopK) [ShapeInferenceError]
+    K input must be a one-dimensional tensor of size 1
+
+Fixed by using `torch.topk` explicitly, which emits K as a constant:
+
+| File | Line | Was | Now |
+|---|---|---|---|
+| `models/Fast_ACV_plus.py` | 278 | `att_weights_prob.sort(2, True)` + `[:, :, :24]` | `torch.topk(..., 24, dim=2, largest=True)` |
+| `models/Fast_ACV_plus.py` | 284 | `ind_k.sort(2, False)[0]` | `torch.topk(..., 24, dim=2, largest=False)` |
+| `models/submodule.py` | 253 | `cost.sort(1, True)` + `[:, :2]` | `torch.topk(cost, 2, dim=1, largest=True)` |
+
+Verified **bit-identical** output before and after (max abs diff 0.000e+00). Originals
+kept as `.orig` beside each file. This belongs in the paper: it is exactly the class of
+edge-deployment obstacle the work is about, and it is not documented by the authors.
+
+### Still to do, and it needs the hardware
+
+TensorRT engine build, INT8 calibration, FPS, and energy per frame **must run on the
+Jetson Orin Nano** - there is no TensorRT or `trtexec` on this Windows box, so no engine
+can be built here. Handoff: copy `onnx/stage6_student.onnx` and
+`Fast-ACVNet/onnx/stage6_teacher.onnx` to the Orin, then use Paper 1's
+`build_int8.py`, `scripts/dump_calib.py` and `benchmark.py` at 25 W with `jetson_clocks`
+pinned, logging the JetPack and TensorRT versions.
+
+| Precision | Model | Latency (ms) | FPS | Peak mem (MB) | Energy (mJ/frame) |
 |---|---|---|---|---|---|
-| FP32 | | | | | |
-| FP16 | | | | | |
-| INT8 | | | | | |
+| FP16 | teacher | | | | |
+| FP16 | student | | | | |
+| INT8 | teacher | | | | |
+| INT8 | student | | | | |
 
 ---
 
