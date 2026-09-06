@@ -309,6 +309,20 @@ INT8 and the FP16 fallback layers on this laptop dGPU. The Orin is the actual ta
 has a different INT8 path; these timings do not transfer. **The accuracy column does
 transfer** — quantisation error is a property of the network, not the chip.
 
+### Ablation: what the rendering variant is worth
+
+Full table in `RESULTS_ablation.md`. Best setting is **turbid coastal water types
+(3/5/7/9) sampled per image**, at EPE 4.2777 / D1 16.95% — past Paper 1's SGBM floor
+(4.5620 / 18.73%) on both metrics, and −26.9% EPE against direct transfer.
+
+Scale augmentation, built to test the disparity-range hypothesis, changed nothing
+(5.4623 → 5.4195, D1 worse). The domain gap here is optical, not geometric.
+
+Next: render SceneFlow with the same turbid randomisation. It is already on disk at
+`C:\SCENEFLOW` with dense PFM disparity, ~26,790 pairs against the 200 KITTI pairs used
+so far, and it is the same code path with a different depth source:
+`--water "3,5,7,9"`.
+
 ### Still to do, and it needs the hardware
 
 TensorRT engine build, INT8 calibration, FPS, and energy per frame **must run on the

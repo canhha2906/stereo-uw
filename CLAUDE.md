@@ -173,30 +173,50 @@ run conditions are in `TRAINING_AND_RESULTS.md`.
 |---|---|---|
 | Clone Fast-ACVNet, use the released KITTI 2015 weights | done | Fast-ACVNet+, 3.203 M params, loads 0 missing / 0 unexpected |
 | Evaluate that land model directly on underwater data | done | **EPE 5.8494**, >3px 22.88%, D1 21.53% |
-| Retrain it on KITTI rendered through the physics model | done | 200 pairs, water type III, 54/60 epochs |
-| Re-evaluate on underwater and compare | done | **EPE 5.4623**, >3px 20.88%, D1 19.64% |
+| Retrain it on KITTI rendered through the physics model | done | 200 pairs; water-type randomisation ablated, see below |
+| Re-evaluate on underwater and compare | done | **EPE 4.2777** best (turbid4), beats SGBM 4.5620 |
 | Underwater data used for training | **never** | evaluation only, as required |
 | Distillation | done | GwcNet-lite 0.467 M, 6.9x smaller |
 | Quantization | done on dev box | FP32/FP16/INT8 engines + accuracy for both models; **energy still needs the Orin** |
 
 ### The headline comparison
 
-Both rows on the full UWStereo test split, 2,958 pairs, identical eval path and disparity
-mask. Only the checkpoint differs.
+All rows on the full UWStereo test split, 2,958 pairs, identical eval script and disparity
+mask, same base checkpoint, 60 epochs. Only the named variable differs.
 
-| Model | UWStereo EPE | >3px | D1-all |
-|---|---|---|---|
-| KITTI-pretrained, direct transfer | 5.8494 | 22.88% | 21.53% |
-| **Retrained on physics-rendered KITTI** | **5.4623** | **20.88%** | **19.64%** |
-| improvement | −6.6% | −8.7% | −8.8% |
+| Run | Training data | EPE | >3px | D1-all |
+|---|---|---|---|---|
+| direct transfer | none | 5.8494 | 22.88% | 21.53% |
+| typeIII | Jerlov III only | 5.4623 | 20.88% | 19.64% |
+| scaleaug | Jerlov III + scale aug s∈[1,3] | 5.4195 | 23.04% | 21.52% |
+| mixed10 | all 10 Jerlov types | 4.4677 | 18.86% | 17.65% |
+| **turbid4** | **turbid coastal 3/5/7/9** | **4.2777** | **18.11%** | **16.95%** |
+| *SGBM (Paper 1)* | *classical baseline* | *4.5620* | *—* | *18.73%* |
 
-**Thái's publish condition — better on the underwater set — is met.**
+**Thái's publish condition is met, and then some: turbid4 beats the classical SGBM floor
+on both metrics** — 4.2777 against 4.5620, and 16.95% against 18.73%. That is −26.9% EPE
+versus taking the land-trained model straight underwater, with underwater data never used
+for training.
 
-Two things that must be said next to that number, or a reviewer will say them first:
+### The mechanism, corrected
 
-1. The gain is modest. The model is better underwater, not fixed.
-2. It is still worse than the classical floor. Paper 1's SGBM scores EPE 4.5620 / D1 18.73%
-   on this same split.
+Two predictions made while planning this were wrong, and the correction is the useful part:
+
+1. The **disparity-range diagnosis was wrong.** `ANALYSIS_why_weak.md` argued that KITTI's
+   disparity distribution not covering the target's was the dominant failure. Scale
+   augmentation was built to test exactly that and did essentially nothing —
+   5.4623 → 5.4195 EPE, with D1 getting *worse*.
+2. **More water-type variety was predicted to hurt** and did the opposite. `mixed10` puts
+   only 44.5% of its images inside UWStereo's colour range, against 77.5% for `typeIII`,
+   yet it scored a full point of EPE better.
+
+The correct reading is that this works as **domain randomisation, not domain imitation**.
+Variety in water appearance forces colour-invariant features; matching one target colour
+does not. Geometry variety does nothing because the domain gap is optical, not geometric.
+
+`turbid4` beating `mixed10` adds the other half: diversity **within the plausible region**
+beats diversity across everything. Sampling all ten types spends half the training set on
+near-clear water that looks nothing like the target.
 
 ### Distillation and cost
 

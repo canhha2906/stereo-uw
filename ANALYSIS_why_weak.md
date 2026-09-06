@@ -1,5 +1,13 @@
 # Why the gain is only 6.6%, and what to do about it
 
+> **SUPERSEDED 2026-09-06 — the main diagnosis below is wrong.** It argued that a
+> disparity-range mismatch was the dominant failure. That was tested directly with scale
+> augmentation and it did essentially nothing (EPE 5.4623 → 5.4195, D1 worse). What
+> actually moved the result was **water-type randomisation**: EPE 4.2777, which beats
+> Paper 1's SGBM floor of 4.5620. The gap is optical, not geometric. See
+> `RESULTS_ablation.md` and CLAUDE.md section 5b. The distribution measurements below are
+> still correct as measurements; the conclusion drawn from them is not.
+
 Thái's read after checking the repo: *"kết quả chưa khả quan lắm"*. Agreed. This is the
 diagnosis, run on the Stage-4 model against the UWStereo test split, plus what the
 evidence says to do next.
