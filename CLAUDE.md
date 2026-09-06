@@ -75,16 +75,23 @@ Report: EPE, D1 / >3px. Save qualitative disparity maps.
 
 Apply the underwater image formation model to KITTI's left and right images.
 
-    U_c(x) = I_c(x) · t_c(x) + A_c · (1 − t_c(x))
-    t_c(x) = exp(−β_c · d(x))
+    U_c(x) = I_c(x) · T_c(x) + B_c · (1 − T_c(x))
+    T_c(x) = N_c ^ d(x)
 
 where, per colour channel c ∈ {R, G, B}:
 - `I_c(x)` = original clear KITTI pixel value
 - `U_c(x)` = rendered underwater pixel value
 - `d(x)` = distance from camera to that pixel, in metres
-- `β_c` = attenuation coefficient for that channel, per metre — depends on water type
-- `A_c` = global ambient (background) light for that channel
-- `t_c(x)` = transmission, fraction of light surviving the path
+- `N_c` = normalised residual energy ratio per metre, from UWCNN Table 1
+- `B_c` = global background (veiling) light for that channel
+- `T_c(x)` = transmission, fraction of light surviving the path
+
+> **Corrected 2026-09-06.** This section first wrote the transmission as
+> `exp(−β·d)`. UWCNN Eq. 2 is **base-N**, `T = N^d = 10^(−β·d)`; using base e
+> silently changes the water by a factor of ln(10). The implementation in
+> `Fast-ACVNet/render_kitti_underwater.py` uses base-N and is correct.
+> `B_c` also had to become wavelength-dependent — see section 6.2b, that one
+> changes results and must be declared in the paper.
 
 Implementation notes:
 - `d(x)` comes from KITTI disparity via `Z = f · B / disparity`, with focal length
@@ -152,6 +159,88 @@ project living in the same repo. Its spec is at
 `conference paper, computer vision/instruction/CLAUDE.md` and its code
 (`models/`, `train.py`, `finetune.py`, `evaluate.py`, `configs/`, `runs/`) stays
 untouched. Reuse from it is limited to the deployment tooling named in Stage 6.
+
+---
+
+## 5b. PROGRESS — where the work actually stands (2026-09-06)
+
+Everything below is measured, not estimated. Empty cells mean not run. Full numbers and
+run conditions are in `TRAINING_AND_RESULTS.md`.
+
+### Thái's plan, step by step
+
+| Step | Status | Result |
+|---|---|---|
+| Clone Fast-ACVNet, use the released KITTI 2015 weights | done | Fast-ACVNet+, 3.203 M params, loads 0 missing / 0 unexpected |
+| Evaluate that land model directly on underwater data | done | **EPE 5.8494**, >3px 22.88%, D1 21.53% |
+| Retrain it on KITTI rendered through the physics model | done | 200 pairs, water type III, 54/60 epochs |
+| Re-evaluate on underwater and compare | done | **EPE 5.4623**, >3px 20.88%, D1 19.64% |
+| Underwater data used for training | **never** | evaluation only, as required |
+| Distillation | done | GwcNet-lite 0.467 M, 6.9x smaller |
+| Quantization | partial | ONNX exported for both; TensorRT engines still to build |
+
+### The headline comparison
+
+Both rows on the full UWStereo test split, 2,958 pairs, identical eval path and disparity
+mask. Only the checkpoint differs.
+
+| Model | UWStereo EPE | >3px | D1-all |
+|---|---|---|---|
+| KITTI-pretrained, direct transfer | 5.8494 | 22.88% | 21.53% |
+| **Retrained on physics-rendered KITTI** | **5.4623** | **20.88%** | **19.64%** |
+| improvement | −6.6% | −8.7% | −8.8% |
+
+**Thái's publish condition — better on the underwater set — is met.**
+
+Two things that must be said next to that number, or a reviewer will say them first:
+
+1. The gain is modest. The model is better underwater, not fixed.
+2. It is still worse than the classical floor. Paper 1's SGBM scores EPE 4.5620 / D1 18.73%
+   on this same split.
+
+### Distillation and cost
+
+| Model | Params | Latency (ms) | Peak mem | UWStereo EPE |
+|---|---|---|---|---|
+| Teacher, physics-retrained | 3.203 M | 34.2 | 371 MB | 5.4623 |
+| Student, distilled | 0.467 M | 6.5 | 70 MB | 6.8941 |
+| ratio | 6.9x smaller | **5.3x faster** | 5.3x less | +1.43 px |
+
+Timing is RTX 5060 at 480x640, FP32 PyTorch — **the dev GPU, not the Orin**. The ratio is
+the transferable part. Distillation is a deployment-budget trade, not a failure: it costs
+1.43 px and buys 5.3x speed. An earlier note in this repo called it simply a negative
+result; that was incomplete.
+
+Initialisation was tested and ruled out as the cause: starting the student from Paper 1's
+SceneFlow-pretrained checkpoint dropped the starting loss from 14.77 to 2.69 and changed
+final accuracy not at all (6.67 → 6.89 EPE). The remaining suspect is data scale — 200
+KITTI pairs is very little.
+
+### Blocker found and fixed
+
+Fast-ACVNet+ does not export to ONNX as shipped. Three sites pick a top-k with
+`sort()` + slice, which PyTorch emits as a `TopK` whose K operand onnxruntime and
+TensorRT both reject. Replaced with explicit `torch.topk`; output is bit-identical
+(max abs diff 0.000e+00), originals kept as `.orig`. Worth a paragraph in the paper —
+it is exactly the deployment obstacle this work is about, and the authors do not
+document it.
+
+### What is left
+
+- TensorRT engines, INT8, FPS — TensorRT is being installed on the dev box, which
+  answers whether INT8 breaks disparity regression (device-independent)
+- **Energy per frame requires the Jetson Orin Nano.** No laptop GPU can measure it.
+- SQUID real-water evaluation — not downloaded (45.8 GB, and it gives distance maps
+  rather than disparity, so it needs a conversion step)
+
+### Where the code is
+
+| Path | What |
+|---|---|
+| `Workspace/code/Fast-ACVNet/` | teacher: render, train, eval, ONNX export |
+| `Workspace/code/stereo-uw/` | this repo: student, distillation, Paper 1, Orin tooling |
+| `TRAINING_AND_RESULTS.md` | every command and every measured number |
+| `onnx/stage6_*.onnx` | both models, ready for the Orin |
 
 ---
 
