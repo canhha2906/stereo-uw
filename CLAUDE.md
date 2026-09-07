@@ -4,6 +4,23 @@
 > This plan came from the senior (Thái). Execute it as written.
 > Do not redesign it, do not substitute components, do not reorder the stages.
 
+> ## STATUS 2026-09-07 — EXPERIMENTS ARE DONE. WRITING PHASE.
+> **Submission deadline 2026-09-10. Three days.**
+> Every planned experiment has produced a number; the headline result beats the classical
+> baseline. **Do not start new experiments.** The only compute work left that the paper
+> actually needs is qualitative figures — there are currently none, and no stereo paper
+> ships without them.
+>
+> Cut from this paper: the distillation section. Its student was distilled from the old
+> typeIII teacher (EPE 5.46), not the turbid4 one (4.28), so quoting both is incoherent —
+> and dropping it frees space in a 5-page limit. It is a separate story for a later paper.
+>
+> Known limitation to state plainly rather than hide: **evaluation is synthetic-only.**
+> Training renders KITTI with a physical model; UWStereo is itself UE5-rendered. There is
+> no real-water stereo result. FLSea on disk is monocular (60 images, no stereo pairs) and
+> unusable for this; SQUID is 45.8 GB, not downloaded, and would need distance-to-disparity
+> conversion. Not feasible before the deadline. Say so in Limitations.
+
 ---
 
 ## 0. One-line goal
@@ -197,6 +214,28 @@ mask, same base checkpoint, 60 epochs. Only the named variable differs.
 on both metrics** — 4.2777 against 4.5620, and 16.95% against 18.73%. That is −26.9% EPE
 versus taking the land-trained model straight underwater, with underwater data never used
 for training.
+
+### Few-shot adaptation (added at Thái's request)
+
+Starting from the turbid4 checkpoint, fine-tuned on N labelled UWStereo pairs drawn from
+the **train** split. The 2,958-pair test split is never touched. Evaluated on a fixed
+600-image subset, so these compare to each other but not to the table above (N=0 is
+3.9314 here against 4.2777 there).
+
+| N | EPE | >3px | D1-all |
+|---|---|---|---|
+| 0 | 3.9314 | 17.61% | 16.40% |
+| 1 | **5.2915** | 18.82% | 17.58% |
+| 5 | 3.3388 | 15.03% | 13.85% |
+| 10 | 3.3061 | 14.30% | 13.07% |
+| 25 | 2.7593 | 13.04% | 11.83% |
+| 50 | **2.5448** | 10.35% | 9.24% |
+
+**One labelled image is worse than none** — 200 epochs on a single scene overfits away
+more than the label gives back. Useful only from N=5. **No plateau by N=50**, so the
+honest statement is that labels keep paying and 50 is not a ceiling.
+
+The zero-label claim is unaffected; this is an added curve, not a replacement.
 
 ### The mechanism, corrected
 
